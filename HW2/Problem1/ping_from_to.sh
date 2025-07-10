@@ -14,7 +14,8 @@ if [ "$DEST" == "router" ]; then
     DEST_IP="172.0.0.1"
 else
     # Get IP address of the destination node
-    DEST_IP=$(ip netns exec $DEST ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
+    DEST_IP=$(ip netns exec "$DEST" ip -4 -o addr show scope global \
+          | awk '{split($4,a,"/"); print a[1]}' | head -n 1)
 fi
 
 # Ping the destination from the source
