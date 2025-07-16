@@ -10,9 +10,6 @@ ip netns add router
 # Create bridges in the root namespace
 ip link add br1 type bridge
 ip link add br2 type bridge
-
-# Set up bridges
-echo "Configuring Bridges"
 ip link set br1 up
 ip link set br2 up
 
@@ -23,7 +20,6 @@ ip link add veth-node3 type veth peer name veth-br23
 ip link add veth-node4 type veth peer name veth-br24
 ip link add veth-router1 type veth peer name veth-br1
 ip link add veth-router2 type veth peer name veth-br2
-
 ip link set veth-node1 netns node1
 ip link set veth-node2 netns node2
 ip link set veth-node3 netns node3
@@ -31,15 +27,13 @@ ip link set veth-node4 netns node4
 ip link set veth-router1 netns router
 ip link set veth-router2 netns router
 
-# Set up
-echo "Setting Nodes"
+
 ip netns exec node1 ip link set veth-node1 up
 ip netns exec node2 ip link set veth-node2 up
 ip netns exec node3 ip link set veth-node3 up
 ip netns exec node4 ip link set veth-node4 up
 ip netns exec router ip link set veth-router1 up
 ip netns exec router ip link set veth-router2 up
-
 ip link set veth-br1 up
 ip link set veth-br2 up
 ip link set veth-br11 up
@@ -65,11 +59,9 @@ ip netns exec node4 ip addr add 10.10.0.3/24 dev veth-node4
 ip netns exec router ip addr add 172.0.0.1/24 dev veth-router1
 ip netns exec router ip addr add 10.10.0.1/24 dev veth-router2
 
-# Enable IP forwarding in the router
+# IP forwarding
 ip netns exec router sysctl -w net.ipv4.ip_forward=1
 
-# Set default gateways
-echo "Configuring default gateways"
 ip netns exec node1 ip route add default via 172.0.0.1
 ip netns exec node2 ip route add default via 172.0.0.1
 ip netns exec node3 ip route add default via 10.10.0.1

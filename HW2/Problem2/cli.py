@@ -1,86 +1,87 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+"""
+A simple container launcher that isolates UTS, network, PID, and mount namespaces,
+optionally constraining memory usage via cgroups.
+"""
 
 import os
 import subprocess
-import sys
+import argparse
+import logging
 
-
-def _build_cgroup_path(pid):
-    """Construct the memory cgroup directory for this process."""
-    base = "/sys/fs/cgroup/memory"
-    return os.path.join(base, f"container_{pid}")
-
-
-def _ensure_dir(path):
-    """Create a directory if it doesn’t already exist."""
-    os.makedirs(path, exist_ok=True)
-
-
-def _write_cgroup_file(cg_path, filename, content):
-    """Write a string value into a cgroup control file."""
-    file_path = os.path.join(cg_path, filename)
-    with open(file_path, 'w') as f:
-        f.write(str(content))
-
-
-def set_memory_limit(limit):
+class ContainerManager:
     """
-    Public API: limit memory (in MiB) for this container’s cgroup.
+    Encapsulates the logic for creating and running a lightweight container.
     """
-    pid = os.getpid()
-    cg_path = _build_cgroup_path(pid)
-    _ensure_dir(cg_path)
+    def __init__(self, hostname: str, rootfs: str = "container", memory_limit_mb: int = None):
+        self.hostname = hostname
+        self.rootfs = rootfs
+        self.memory_limit_mb = memory_limit_mb
+        self.pid = os.getpid()
+        self.cgroup_path = f"/sys/fs/cgroup/memory/container_{self.pid}"
 
-    # Set the memory cap and add this process to the group
-    _write_cgroup_file(cg_path, "memory.limit_in_bytes", limit * 1024**2)
-    _write_cgroup_file(cg_path, "tasks", pid)
+    def apply_memory_limit(self):
+        """
+        Sets up a memory cgroup for this process and applies a memory limit.
+        """
+        os.makedirs(self.cgroup_path, exist_ok=True)
+        limit_bytes = self.memory_limit_mb * 1024**2
+        with open(os.path.join(self.cgroup_path, "memory.limit_in_bytes"), 'w') as limit_file:
+            limit_file.write(str(limit_bytes))
+        with open(os.path.join(self.cgroup_path, "tasks"), 'w') as tasks_file:
+            tasks_file.write(str(self.pid))
+        logging.debug(f"Memory limit of {self.memory_limit_mb} MB applied to cgroup {self.cgroup_path}")
+
+    def launch(self):
+        """
+        Unshares namespaces, optionally applies memory limit, and drops into a shell in the new root.
+        """
+        logging.info(f"Container starting with PID {self.pid}\nHostname: {self.hostname}\nRootfs: {self.rootfs}")
+
+        if self.memory_limit_mb is not None:
+            self.apply_memory_limit()
+
+        command = [
+            "unshare", "--uts", "--net", "--pid", "--mount", "--fork",
+            "chroot", self.rootfs, "/bin/bash", "-c",
+            f"mount -t proc proc /proc && hostname {self.hostname} && exec bash"
+        ]
+        subprocess.run(command, check=True)
+        logging.info("Container process exited")
 
 
-def _compose_unshare_command(hostname, rootfs):
-    """Build the subprocess command for unshare + chroot."""
-    return [
-        "unshare", "--uts", "--net", "--pid", "--mount", "--fork",
-        "chroot", rootfs, "/bin/bash", "-c",
-        f"mount -t proc proc /proc; hostname {hostname}; exec bash"
-    ]
-
-
-def _run_subprocess(cmd):
-    """Run a command and raise if it fails."""
-    subprocess.run(cmd, check=True)
-
-
-def run_container(hostname, rootfs, limit=False):
-    """
-    Public API: start a minimal containerized bash with optional memory limit.
-    """
-    my_pid = os.getpid()
-    print(f"Container started running with PID: {my_pid}")
-
-    if limit:
-        set_memory_limit(limit)
-
-    cmd = _compose_unshare_command(hostname, rootfs)
-    _run_subprocess(cmd)
+def parse_args():
+    parser = argparse.ArgumentParser(description="Launch an isolated container environment.")
+    parser.add_argument(
+        "hostname",
+        help="Hostname to assign inside the container"
+    )
+    parser.add_argument(
+        "-r", "--rootfs",
+        default="container",
+        help="Path to the container filesystem root"
+    )
+    parser.add_argument(
+        "-m", "--memory",
+        type=int,
+        metavar="MB",
+        help="Optional memory limit in megabytes"
+    )
+    return parser.parse_args()
 
 
 def main():
-    """
-    CLI entrypoint: usage:
-      script.py <hostname> [memory_limit_mib]
-    """
-    if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <hostname> [memory_limit_mib]")
-        sys.exit(1)
-
-    hostname = sys.argv[1]
-    rootfs = "container"
-
-    if len(sys.argv) > 2:
-        mem_limit = int(sys.argv[2])
-        run_container(hostname, rootfs, limit=mem_limit)
-    else:
-        run_container(hostname, rootfs)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s: %(message)s"
+    )
+    args = parse_args()
+    manager = ContainerManager(
+        hostname=args.hostname,
+        rootfs=args.rootfs,
+        memory_limit_mb=args.memory
+    )
+    manager.launch()
 
 
 if __name__ == "__main__":
