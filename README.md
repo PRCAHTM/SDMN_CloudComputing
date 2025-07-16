@@ -2,12 +2,12 @@
 
 > **Course:** Software‑Defined & Mobile Networks (SDMN)  
 > **Term:** Spring 2025  
-> **Student:** Parsa Hatami
-> **Instructor:** Dr.Khalaj & Dr.Ravanshid
+> **Student:** Parsa Hatami  
+> **Instructor:** Dr.Khalaj & Dr.Ravanshid  
 
 ---
 
-## What you’ll find in this repo
+##  What you’ll find in this repo
 
 | Folder | Problem | One‑liner |
 |--------|---------|-----------|
