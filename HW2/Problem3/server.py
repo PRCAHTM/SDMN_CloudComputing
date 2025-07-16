@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-A simple threaded HTTP API server to get and set a status value at /api/v1/status.
-"""
 
 import argparse
 import json

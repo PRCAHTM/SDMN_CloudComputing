@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-A simple container launcher that isolates UTS, network, PID, and mount namespaces,
-optionally constraining memory usage via cgroups.
-"""
 
 import os
 import subprocess
